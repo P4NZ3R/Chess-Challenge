@@ -8,7 +8,48 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        return GetBestMove(board, 2).bestMove;
+        int depth = 6;
+
+        int numOfpieces = CountBitsSetTo1(board.AllPiecesBitboard);
+        if(numOfpieces > 26)
+        {
+            depth = Math.Min(depth, 2);
+        }
+        else if(numOfpieces > 16)
+        {
+            depth = Math.Min(depth, 3);
+        }
+        else if(numOfpieces > 10)
+        {
+            depth = Math.Min(depth, 4);
+        }
+        else if (numOfpieces > 6)
+        {
+            depth = Math.Min(depth, 5);
+        }
+
+        if (timer.MillisecondsRemaining > 10000)
+        {
+            depth = Math.Min(depth, 2);
+        }
+        else if (timer.MillisecondsRemaining > 5000)
+        {
+            depth = Math.Min(depth, 1);
+        }
+
+
+        return GetBestMove(board, depth).bestMove;
+    }
+
+    public static int CountBitsSetTo1(ulong number)
+    {
+        int count = 0;
+        while (number > 0)
+        {
+            count += (int)(number & 1); // Check the rightmost bit and add it to the count
+            number >>= 1; // Shift the number one bit to the right
+        }
+        return count;
     }
 
     (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
@@ -24,11 +65,6 @@ public class MyBot : IChessBot
             {
                 value = LookUpTableEvaluation(board);
                 board.UndoMove(move);
-                //if (value * GetMultiplier(board.IsWhiteToMove) >= bestboardValue * GetMultiplier(board.IsWhiteToMove))
-                //{
-                //    bestMove = move;
-                //    bestboardValue = value;
-                //}
             }
             else
             {
@@ -77,8 +113,10 @@ public class MyBot : IChessBot
                 value += pawnValue * pawnValue;
                 break;
             case PieceType.Knight:
-                break;
             case PieceType.Bishop:
+                //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
+                //value += (int)knightValue;
+                break;
                 break;
             case PieceType.Rook:
                 break;
