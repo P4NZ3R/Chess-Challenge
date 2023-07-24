@@ -7,48 +7,47 @@ namespace ChessChallenge.Example
     // Plays randomly otherwise.
     public class EvilBot : IChessBot
     {
-        // Piece values: null, pawn, knight, bishop, rook, queen, king
-        int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-
         public Move Think(Board board, Timer timer)
         {
+            return GetBestMove(board, 0);
+        }
+
+        Move GetBestMove(Board board, int depth = 0)
+        {
             Move[] allMoves = board.GetLegalMoves();
-
-            // Pick a random move to play if nothing better is found
-            Random rng = new();
-            Move moveToPlay = allMoves[rng.Next(allMoves.Length)];
-            int highestValueCapture = 0;
-
+            Move bestMove = allMoves[0];
+            int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
             foreach (Move move in allMoves)
             {
-                // Always play checkmate in one
-                if (MoveIsCheckmate(board, move))
+                board.MakeMove(move);
+                int value = LookUpTableEvaluation(board);
+                board.UndoMove(move);
+                if (value * GetMultiplier(board.IsWhiteToMove) >= bestboardValue * GetMultiplier(board.IsWhiteToMove))
                 {
-                    moveToPlay = move;
-                    break;
-                }
-
-                // Find highest value capture
-                Piece capturedPiece = board.GetPiece(move.TargetSquare);
-                int capturedPieceValue = pieceValues[(int)capturedPiece.PieceType];
-
-                if (capturedPieceValue > highestValueCapture)
-                {
-                    moveToPlay = move;
-                    highestValueCapture = capturedPieceValue;
+                    bestMove = move;
+                    bestboardValue = value;
                 }
             }
 
-            return moveToPlay;
+            return bestMove;
         }
 
-        // Test if this move gives checkmate
-        bool MoveIsCheckmate(Board board, Move move)
+        int GetMultiplier(bool isWhite) => isWhite ? 1 : -1;
+
+        // Piece values: null, pawn, knight, bishop, rook, queen, king
+        int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        int LookUpTableEvaluation(Board board)
         {
-            board.MakeMove(move);
-            bool isMate = board.IsInCheckmate();
-            board.UndoMove(move);
-            return isMate;
+            if (board.IsInCheckmate())
+                return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
+
+            int boardValue = 0;
+            foreach (PieceList piecelist in board.GetAllPieceLists())
+            {
+                boardValue += GetMultiplier(piecelist.IsWhitePieceList) * pieceValues[(int)piecelist.TypeOfPieceInList] * piecelist.Count;
+            }
+            return boardValue;
         }
+
     }
 }
