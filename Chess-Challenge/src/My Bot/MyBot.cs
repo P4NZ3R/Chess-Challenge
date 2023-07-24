@@ -22,13 +22,12 @@ public class MyBot : IChessBot
         {
             board.MakeMove(move);
             int value = LookUpTableEvaluation(board);
-            Debug.WriteLine($"{value} {move.ToString()}");
+            board.UndoMove(move);
             if (value * GetMultiplier(board.IsWhiteToMove) >= bestboardValue * GetMultiplier(board.IsWhiteToMove))
             {
                 bestMove = move;
                 bestboardValue = value;
             }
-            board.UndoMove(move);
         }
 
         return bestMove;
