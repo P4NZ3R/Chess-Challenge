@@ -8,33 +8,15 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        int depth = 6;
-
+        int depth = 4;
+        //
         int numOfpieces = CountBitsSetTo1(board.AllPiecesBitboard);
-        if(numOfpieces > 26)
+        //int numOfPawnsWhite = CountBitsSetTo1(board.GetPieceBitboard(PieceType.Pawn, true));
+        //int numOfPawnsBlack = CountBitsSetTo1(board.GetPieceBitboard(PieceType.Pawn, false));
+        numOfpieces = numOfpieces /*- numOfPawnsWhite - numOfPawnsBlack*/ - 2;
+        if (numOfpieces > 4)
         {
             depth = Math.Min(depth, 2);
-        }
-        else if(numOfpieces > 16)
-        {
-            depth = Math.Min(depth, 3);
-        }
-        else if(numOfpieces > 10)
-        {
-            depth = Math.Min(depth, 4);
-        }
-        else if (numOfpieces > 6)
-        {
-            depth = Math.Min(depth, 5);
-        }
-
-        if (timer.MillisecondsRemaining > 10000)
-        {
-            depth = Math.Min(depth, 2);
-        }
-        else if (timer.MillisecondsRemaining > 5000)
-        {
-            depth = Math.Min(depth, 1);
         }
 
 
@@ -91,6 +73,9 @@ public class MyBot : IChessBot
     {
         if(board.IsInCheckmate())
             return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
+
+        if (board.IsDraw())
+            return 0;
 
         int boardValue = 0;
         foreach (PieceList piecelist in board.GetAllPieceLists())
