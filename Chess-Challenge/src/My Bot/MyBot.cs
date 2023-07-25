@@ -8,10 +8,10 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        return GetBestMove(board, 2).bestMove;
+        return GetBestMove(board, timer, 2).bestMove;
     }
 
-    (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
+    (Move bestMove, int bestValue) GetBestMove(Board board, Timer timer, int depth = 0)
     {
         Move[] allMoves = depth >= 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
         Move bestMove = allMoves[0];
@@ -26,11 +26,18 @@ public class MyBot : IChessBot
             }
             else if(depth <= 0)
             {
-                value = LookUpTableEvaluation(board);
+                if (depth >= -1 && timer.MillisecondsRemaining > 15000 && HasRelevantMove(board))
+                {
+                    (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
+                }
+                else
+                {
+                    value = LookUpTableEvaluation(board);
+                }
             }
             else
             {
-                (Move localBestMove, value) = GetBestMove(board, depth - 1);
+                (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
             }
 
             board.UndoMove(move);
@@ -78,8 +85,10 @@ public class MyBot : IChessBot
                 value += pawnValue * pawnValue;
                 break;
             case PieceType.Knight:
-                break;
             case PieceType.Bishop:
+                //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
+                //value += (int)knightValue;
+                break;
                 break;
             case PieceType.Rook:
                 break;
