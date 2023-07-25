@@ -1,26 +1,14 @@
 ﻿using ChessChallenge.API;
-using Raylib_cs;
 using System;
-using System.ComponentModel;
-using System.Diagnostics;
+using System.Numerics;
+using System.Collections.Generic;
+using System.Linq;
 
 public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        int depth = 4;
-        //
-        int numOfpieces = CountBitsSetTo1(board.AllPiecesBitboard);
-        //int numOfPawnsWhite = CountBitsSetTo1(board.GetPieceBitboard(PieceType.Pawn, true));
-        //int numOfPawnsBlack = CountBitsSetTo1(board.GetPieceBitboard(PieceType.Pawn, false));
-        numOfpieces = numOfpieces /*- numOfPawnsWhite - numOfPawnsBlack*/ - 2;
-        if (numOfpieces > 4)
-        {
-            depth = Math.Min(depth, 2);
-        }
-
-
-        return GetBestMove(board, depth).bestMove;
+        return GetBestMove(board, 2).bestMove;
     }
 
     public static int CountBitsSetTo1(ulong number)
@@ -36,24 +24,39 @@ public class MyBot : IChessBot
 
     (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
     {
-        Move[] allMoves = board.GetLegalMoves();
+        if(depth <= 0 && !HasRelevantMove(board))
+        {
+            return (new Move(), LookUpTableEvaluation(board));//TMP workaround
+        }
+
+        Move[] allMoves = depth > 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
         Move bestMove = allMoves[0];
         int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
         foreach (Move move in allMoves)
         {
             board.MakeMove(move);
             int value = 0;
-            if (depth <= 0 || board.IsDraw() || board.IsInCheckmate())
+            if (board.IsDraw() || board.IsInCheckmate())
             {
                 value = LookUpTableEvaluation(board);
-                board.UndoMove(move);
+            }
+            else if(depth <= 0)
+            {
+                if(depth >= -2 && HasRelevantMove(board))
+                {
+                    (Move localBestMove, value) = GetBestMove(board, depth - 1);
+                }
+                else
+                {
+                    value = LookUpTableEvaluation(board);
+                }
             }
             else
             {
                 (Move localBestMove, value) = GetBestMove(board, depth - 1);
-                board.UndoMove(move);
             }
 
+            board.UndoMove(move);
             if (value * GetMultiplier(board.IsWhiteToMove) >= bestboardValue * GetMultiplier(board.IsWhiteToMove))
             {
                 bestMove = move;
@@ -71,7 +74,7 @@ public class MyBot : IChessBot
 
     int LookUpTableEvaluation(Board board)
     {
-        if(board.IsInCheckmate())
+        if (board.IsInCheckmate())
             return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
 
         if (board.IsDraw())
@@ -112,5 +115,41 @@ public class MyBot : IChessBot
         }
 
         return GetMultiplier(piece.IsWhite) * value;
+    }
+
+    bool HasRelevantMove(Board board)
+    {
+        Move[] allMoves = board.GetLegalMoves();
+
+        for (int i = 0; i < allMoves.Length; i++)
+        {
+            if (IsRelevantMove(board, allMoves[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    List<Move> GetRelevantMoves(Board board)
+    {
+        Move[] allMoves = board.GetLegalMoves();
+        List<Move> relevantMoves = new List<Move>();
+
+        for (int i = 0; i < allMoves.Length; i++)
+        {
+            if(IsRelevantMove(board, allMoves[i]))
+            {
+                relevantMoves.Add(allMoves[i]);
+            }
+        }
+
+        return relevantMoves;
+    }
+
+    bool IsRelevantMove(Board board, Move move)
+    {
+        return move.IsCapture || move.IsPromotion || move.IsEnPassant;
     }
 }
