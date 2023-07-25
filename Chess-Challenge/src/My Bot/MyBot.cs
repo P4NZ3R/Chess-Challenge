@@ -13,12 +13,7 @@ public class MyBot : IChessBot
 
     (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
     {
-        if(depth <= 0 && !HasRelevantMove(board))
-        {
-            return (new Move(), LookUpTableEvaluation(board));//TMP workaround
-        }
-
-        Move[] allMoves = depth > 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
+        Move[] allMoves = depth >= 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
         Move bestMove = allMoves[0];
         int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
         foreach (Move move in allMoves)
@@ -31,14 +26,7 @@ public class MyBot : IChessBot
             }
             else if(depth <= 0)
             {
-                //if(depth >= -3 && HasRelevantMove(board))
-                //{
-                //    (Move localBestMove, value) = GetBestMove(board, depth - 1);
-                //}
-                //else
-                {
-                    value = LookUpTableEvaluation(board);
-                }
+                value = LookUpTableEvaluation(board);
             }
             else
             {
