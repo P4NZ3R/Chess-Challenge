@@ -11,17 +11,6 @@ public class MyBot : IChessBot
         return GetBestMove(board, 2).bestMove;
     }
 
-    public static int CountBitsSetTo1(ulong number)
-    {
-        int count = 0;
-        while (number > 0)
-        {
-            count += (int)(number & 1); // Check the rightmost bit and add it to the count
-            number >>= 1; // Shift the number one bit to the right
-        }
-        return count;
-    }
-
     (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
     {
         if(depth <= 0 && !HasRelevantMove(board))
@@ -97,14 +86,12 @@ public class MyBot : IChessBot
         switch (piece.PieceType)
         {
             case PieceType.Pawn:
-                //int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
-                //value += pawnValue * pawnValue;
+                int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
+                value += pawnValue * pawnValue;
                 break;
             case PieceType.Knight:
-            case PieceType.Bishop:
-                //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
-                //value += (int)knightValue;
                 break;
+            case PieceType.Bishop:
                 break;
             case PieceType.Rook:
                 break;
@@ -152,4 +139,19 @@ public class MyBot : IChessBot
     {
         return move.IsCapture || move.IsPromotion || move.IsEnPassant;
     }
+
+    #region Utilities
+
+    public static int CountBitsSetTo1(ulong number)
+    {
+        int count = 0;
+        while (number > 0)
+        {
+            count += (int)(number & 1); // Check the rightmost bit and add it to the count
+            number >>= 1; // Shift the number one bit to the right
+        }
+        return count;
+    }
+
+    #endregion
 }

@@ -50,7 +50,7 @@ namespace ChessChallenge.Example
         int LookUpTableEvaluation(Board board)
         {
             if (board.IsInCheckmate())
-                return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
+                return GetMultiplier(!board.IsWhiteToMove) * 1000000;
 
             int boardValue = 0;
             foreach (PieceList piecelist in board.GetAllPieceLists())
