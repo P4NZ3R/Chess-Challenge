@@ -42,11 +42,11 @@ public class MyBot : IChessBot
             }
             else if(depth <= 0)
             {
-                if(depth >= -2 && HasRelevantMove(board))
-                {
-                    (Move localBestMove, value) = GetBestMove(board, depth - 1);
-                }
-                else
+                //if(depth >= -3 && HasRelevantMove(board))
+                //{
+                //    (Move localBestMove, value) = GetBestMove(board, depth - 1);
+                //}
+                //else
                 {
                     value = LookUpTableEvaluation(board);
                 }
@@ -75,7 +75,7 @@ public class MyBot : IChessBot
     int LookUpTableEvaluation(Board board)
     {
         if (board.IsInCheckmate())
-            return board.IsWhiteToMove ? int.MinValue : int.MaxValue;
+            return GetMultiplier(!board.IsWhiteToMove) * 1000000;
 
         if (board.IsDraw())
             return 0;
@@ -97,8 +97,8 @@ public class MyBot : IChessBot
         switch (piece.PieceType)
         {
             case PieceType.Pawn:
-                int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
-                value += pawnValue * pawnValue;
+                //int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
+                //value += pawnValue * pawnValue;
                 break;
             case PieceType.Knight:
             case PieceType.Bishop:
