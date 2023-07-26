@@ -10,38 +10,30 @@ namespace ChessChallenge.Example
     {
         public Move Think(Board board, Timer timer)
         {
-            return GetBestMove(board, timer, 2).bestMove;
+            return GetBestMove(board, timer, 1).bestMove;
         }
 
         (Move bestMove, int bestValue) GetBestMove(Board board, Timer timer, int depth = 0)
         {
-            Move[] allMoves = depth >= 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
+            Move[] allMoves = board.GetLegalMoves();
             Move bestMove = allMoves[0];
             int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
             foreach (Move move in allMoves)
             {
                 board.MakeMove(move);
                 int value = 0;
-                if (board.IsDraw() || board.IsInCheckmate())
+                if (board.IsDraw() || board.IsInCheckmate() || (depth < 0 && !IsRelevantMove(board, move)))
                 {
                     value = LookUpTableEvaluation(board);
                 }
                 else if (depth <= 0)
                 {
-                    if (HasRelevantMove(board))
+                    if (HasRelevantMove(board) &&
+                        ((depth >= -2 && timer.MillisecondsRemaining > 25000) ||
+                        (depth >= -1 && timer.MillisecondsRemaining > 15000) ||
+                        (depth >= 0 && timer.MillisecondsRemaining > 5000)))
                     {
-                        if (depth >= -1 && timer.MillisecondsRemaining > 15000)
-                        {
-                            (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
-                        }
-                        else if (depth >= 0 && timer.MillisecondsRemaining > 5000)
-                        {
-                            (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
-                        }
-                        else
-                        {
-                            value = LookUpTableEvaluation(board);
-                        }
+                        (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
                     }
                     else
                     {
