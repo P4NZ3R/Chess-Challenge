@@ -10,25 +10,47 @@ namespace ChessChallenge.Example
     {
         public Move Think(Board board, Timer timer)
         {
-            return GetBestMove(board, 2).bestMove;
+            return GetBestMove(board, timer, 2).bestMove;
         }
 
-        (Move bestMove, int bestValue) GetBestMove(Board board, int depth = 0)
+        (Move bestMove, int bestValue) GetBestMove(Board board, Timer timer, int depth = 0)
         {
-            Move[] allMoves = board.GetLegalMoves();
+            Move[] allMoves = depth >= 0 ? board.GetLegalMoves() : GetRelevantMoves(board).ToArray();
             Move bestMove = allMoves[0];
             int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
             foreach (Move move in allMoves)
             {
                 board.MakeMove(move);
                 int value = 0;
-                if (depth <= 0 || board.IsDraw() || board.IsInCheckmate())
+                if (board.IsDraw() || board.IsInCheckmate())
                 {
                     value = LookUpTableEvaluation(board);
                 }
+                else if (depth <= 0)
+                {
+                    if (HasRelevantMove(board))
+                    {
+                        if (depth >= -1 && timer.MillisecondsRemaining > 15000)
+                        {
+                            (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
+                        }
+                        else if (depth >= 0 && timer.MillisecondsRemaining > 5000)
+                        {
+                            (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
+                        }
+                        else
+                        {
+                            value = LookUpTableEvaluation(board);
+                        }
+                    }
+                    else
+                    {
+                        value = LookUpTableEvaluation(board);
+                    }
+                }
                 else
                 {
-                    (Move localBestMove, value) = GetBestMove(board, depth - 1);
+                    (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
                 }
 
                 board.UndoMove(move);
@@ -73,11 +95,13 @@ namespace ChessChallenge.Example
             {
                 case PieceType.Pawn:
                     int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
-                    value += pawnValue * pawnValue;
+                    value += pawnValue * pawnValue * pawnValue;
                     break;
                 case PieceType.Knight:
-                    break;
                 case PieceType.Bishop:
+                    //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
+                    //value += (int)knightValue;
+                    break;
                     break;
                 case PieceType.Rook:
                     break;
