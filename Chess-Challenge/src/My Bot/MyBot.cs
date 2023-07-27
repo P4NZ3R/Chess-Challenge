@@ -6,162 +6,170 @@ using System.Linq;
 
 public class MyBot : IChessBot
 {
+    Board board;
+
     public Move Think(Board board, Timer timer)
     {
-        //ulong tmp = board.ZobristKey;
-
-        //if(tmp == 13227872743731781434) 
-        //{
-        //    return new Move("e2e4", board);
-        //}
-        //if (tmp == 16079508276067608096)
-        //{
-        //    return new Move("d1f3", board);
-        //}
-
-        return GetBestMove(board, timer, 1).bestMove;
+        this.board = board;
+        MonteCarloTreeSearch mcts = new MonteCarloTreeSearch(board);
+        mcts.SetRoot(new Node(board, null, new Move(), false));
+        return mcts.RunMCTS(timer, 1000);
     }
 
-    (Move bestMove, int bestValue) GetBestMove(Board board, Timer timer, int depth = 0)
+    public class Node
     {
-        Move[] allMoves = board.GetLegalMoves();
-        Move bestMove = allMoves[0];
-        int bestboardValue = board.IsWhiteToMove ? int.MinValue : int.MaxValue;
-        foreach (Move move in allMoves)
+        public Board Board { get; }
+        public Node Parent { get; }
+        public List<Node> Children { get; }
+        public int Visits { get; set; }
+        public double Wins { get; set; }
+        public Move Move { get; }
+        public bool IsWhiteMove { get; }
+
+        public Node(Board board, Node parent, Move move, bool isMaxPlayer)
         {
-            board.MakeMove(move);
-            int value = 0;
-            if (board.IsDraw() || board.IsInCheckmate() || (depth < 0 && !IsRelevantMove(board, move)))
+            Board = board;
+            Parent = parent;
+            Children = new List<Node>();
+            Visits = 0;
+            Wins = 0;
+            Move = move;
+            IsWhiteMove = isMaxPlayer;
+        }
+
+        public bool IsFullyExpanded()
+        {
+            // For simplicity, we assume all possible moves are children
+            return Children.Count == Board.GetLegalMoves().Length;
+        }
+
+        public Node GetBestChild()
+        {
+            // Choose the best child based on the UCT (Upper Confidence Bound for Trees) formula
+            double maxUctValue = double.MinValue;
+            Node bestChild = null;
+            foreach (var child in Children)
             {
-                value = LookUpTableEvaluation(board);
-            }
-            else if(depth <= 0)
-            {
-                if( HasRelevantMove(board) &&
-                    ((depth >= -2 && timer.MillisecondsRemaining > 15000) ||
-                    ( depth >= -1 && timer.MillisecondsRemaining >  5000)))
+                double uctValue = (child.Wins / child.Visits) +
+                                  Math.Sqrt(2 * Math.Log(Visits) / child.Visits);
+                if (uctValue > maxUctValue)
                 {
-                    (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
-                }    
-                else
-                {
-                    value = LookUpTableEvaluation(board);
+                    maxUctValue = uctValue;
+                    bestChild = child;
                 }
             }
-            else
+            return bestChild;
+        }
+
+        public Node SelectUnexploredChild()
+        {
+            // Select an unexplored child (i.e., a move not tried yet)
+            Move[] possibleMoves = Board.GetLegalMoves();
+            foreach (var move in possibleMoves)
             {
-                (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
+                if (Children.FirstOrDefault(child => child.Move == move) == null)
+                {
+                    return new Node(Board, this, move, !IsWhiteMove);
+                }
+            }
+            return null; // All children are explored, this should not happen in Tic Tac Toe
+        }
+    }
+
+    public class MonteCarloTreeSearch
+    {
+        private Board board;
+        private Node root;
+        private Random random;
+
+        public MonteCarloTreeSearch(Board board)
+        {
+            this.board = board;
+            root = null;
+            random = new Random();
+        }
+
+        public Move RunMCTS(Timer timer, int timeToThinkInMilliseconds)
+        {
+            if (root == null)
+            {
+                throw new InvalidOperationException("MCTS cannot run without a root node.");
             }
 
-            board.UndoMove(move);
-            if (value * GetMultiplier(board.IsWhiteToMove) >= bestboardValue * GetMultiplier(board.IsWhiteToMove))
+            while(timer.MillisecondsElapsedThisTurn < timeToThinkInMilliseconds) 
             {
-                bestMove = move;
-                bestboardValue = value;
+                Node selectedNode = Selection(root);
+                Node expandedNode = Expansion(selectedNode);
+                double simulationResult = Simulation(expandedNode);
+                Backpropagation(expandedNode, simulationResult);
+            }
+
+            // Choose the best move based on the most visited child
+            Node bestChild = root.Children.OrderByDescending(child => child.Visits).FirstOrDefault();
+            return bestChild.Move;
+        }
+
+        private Node Selection(Node node)
+        {
+            while (node.Children.Count > 0)
+            {
+                if (!node.IsFullyExpanded())
+                {
+                    return Expansion(node);
+                }
+                node = node.GetBestChild();
+            }
+            return node;
+        }
+
+        private Node Expansion(Node node)
+        {
+            Node unexploredChild = node.SelectUnexploredChild();
+            if (unexploredChild == null)
+            {
+                return node; // All children are explored, this should not happen in Tic Tac Toe
+            }
+            node.Children.Add(unexploredChild);
+            return unexploredChild;
+        }
+
+        private double Simulation(Node node)
+        {
+            Stack<Move> movesMade = new Stack<Move>();
+            while(!board.IsDraw() && !board.IsInCheckmate())
+            {
+                Move[] moves = board.GetLegalMoves();
+                Move move = moves[random.Next(moves.Length)];
+                board.MakeMove(move);
+                movesMade.Push(move);
+            }
+            int eval = 0;
+            if (board.IsDraw())
+                eval = 0;
+            if (board.IsInCheckmate())
+                eval = board.IsWhiteToMove ? -1000000 : 1000000;
+
+            while(movesMade.Count > 0)
+            {
+                board.UndoMove(movesMade.Pop());
+            }
+            
+            return eval;
+        }
+
+        private void Backpropagation(Node node, double result)
+        {
+            while (node != null)
+            {
+                node.Visits++;
+                node.Wins += result;
+                node = node.Parent;
             }
         }
 
-        return (bestMove, bestboardValue);
-    }
-
-    int GetMultiplier(bool isWhite) => isWhite ? 1 : -1;
-
-    // Piece values: null, pawn, knight, bishop, rook, queen, king
-    int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
-
-    int LookUpTableEvaluation(Board board)
-    {
-        if (board.IsInCheckmate())
-            return GetMultiplier(!board.IsWhiteToMove) * 1000000;
-
-        if (board.IsDraw())
-            return 0;
-
-        int boardValue = 0;
-        foreach (PieceList piecelist in board.GetAllPieceLists())
+        public void SetRoot(Node node)
         {
-            for (int i = 0; i < piecelist.Count; i++)
-            {
-                boardValue += GetPieceValue(board, piecelist.GetPiece(i));
-            }
+            root = node;
         }
-        return boardValue;
     }
-
-    int GetPieceValue(Board board, Piece piece)
-    {
-        int value = pieceValues[(int)piece.PieceType];
-        switch (piece.PieceType)
-        {
-            case PieceType.Pawn:
-                int pawnValue = (piece.IsWhite ? piece.Square.Rank - 1 : -piece.Square.Rank + 6);
-                value += pawnValue * pawnValue * pawnValue;
-                break;
-            case PieceType.Knight:
-                float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
-                value += (int)knightValue;
-                break;
-            case PieceType.Bishop:
-                break;
-            case PieceType.Rook:
-                break;
-            case PieceType.Queen:
-                break;
-            case PieceType.King:
-                break;
-        }
-
-        return GetMultiplier(piece.IsWhite) * value;
-    }
-
-    bool HasRelevantMove(Board board)
-    {
-        Move[] allMoves = board.GetLegalMoves();
-
-        for (int i = 0; i < allMoves.Length; i++)
-        {
-            if (IsRelevantMove(board, allMoves[i]))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    List<Move> GetRelevantMoves(Board board)
-    {
-        Move[] allMoves = board.GetLegalMoves();
-        List<Move> relevantMoves = new List<Move>();
-
-        for (int i = 0; i < allMoves.Length; i++)
-        {
-            if(IsRelevantMove(board, allMoves[i]))
-            {
-                relevantMoves.Add(allMoves[i]);
-            }
-        }
-
-        return relevantMoves;
-    }
-
-    bool IsRelevantMove(Board board, Move move)
-    {
-        return move.IsCapture || move.IsPromotion || move.IsEnPassant;
-    }
-
-    #region Utilities
-
-    public static int CountBitsSetTo1(ulong number)
-    {
-        int count = 0;
-        while (number > 0)
-        {
-            count += (int)(number & 1); // Check the rightmost bit and add it to the count
-            number >>= 1; // Shift the number one bit to the right
-        }
-        return count;
-    }
-
-    #endregion
 }
