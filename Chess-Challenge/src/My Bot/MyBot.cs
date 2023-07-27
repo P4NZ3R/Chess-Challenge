@@ -8,7 +8,7 @@ public class MyBot : IChessBot
 {
     public Move Think(Board board, Timer timer)
     {
-        ulong tmp = board.ZobristKey;
+        //ulong tmp = board.ZobristKey;
 
         //if(tmp == 13227872743731781434) 
         //{
@@ -38,9 +38,8 @@ public class MyBot : IChessBot
             else if(depth <= 0)
             {
                 if( HasRelevantMove(board) &&
-                    ((depth >= -2 && timer.MillisecondsRemaining > 25000) ||
-                    ( depth >= -1 && timer.MillisecondsRemaining > 15000) ||
-                    ( depth >=  0 && timer.MillisecondsRemaining >  5000)))
+                    ((depth >= -2 && timer.MillisecondsRemaining > 15000) ||
+                    ( depth >= -1 && timer.MillisecondsRemaining >  5000)))
                 {
                     (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
                 }    
@@ -99,10 +98,10 @@ public class MyBot : IChessBot
                 value += pawnValue * pawnValue * pawnValue;
                 break;
             case PieceType.Knight:
-            case PieceType.Bishop:
-                //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
-                //value += (int)knightValue;
+                float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
+                value += (int)knightValue;
                 break;
+            case PieceType.Bishop:
                 break;
             case PieceType.Rook:
                 break;
