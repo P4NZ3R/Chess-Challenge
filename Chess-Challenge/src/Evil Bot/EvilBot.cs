@@ -29,9 +29,8 @@ namespace ChessChallenge.Example
                 else if (depth <= 0)
                 {
                     if (HasRelevantMove(board) &&
-                        ((depth >= -2 && timer.MillisecondsRemaining > 25000) ||
-                        (depth >= -1 && timer.MillisecondsRemaining > 15000) ||
-                        (depth >= 0 && timer.MillisecondsRemaining > 5000)))
+                        ((depth >= -2 && timer.MillisecondsRemaining > 15000) ||
+                        (depth >= -1 && timer.MillisecondsRemaining > 5000)))
                     {
                         (Move localBestMove, value) = GetBestMove(board, timer, depth - 1);
                     }
@@ -90,10 +89,10 @@ namespace ChessChallenge.Example
                     value += pawnValue * pawnValue * pawnValue;
                     break;
                 case PieceType.Knight:
-                case PieceType.Bishop:
-                    //float knightValue = (float)Math.Abs((3.5*3.5)-(Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
-                    //value += (int)knightValue;
+                    float knightValue = (float)Math.Abs((3.5 * 3.5) - (Math.Abs(piece.Square.Rank - 3.5) * Math.Abs(piece.Square.File - 3.5)));
+                    value += (int)knightValue;
                     break;
+                case PieceType.Bishop:
                     break;
                 case PieceType.Rook:
                     break;
@@ -121,40 +120,9 @@ namespace ChessChallenge.Example
             return false;
         }
 
-        List<Move> GetRelevantMoves(Board board)
-        {
-            Move[] allMoves = board.GetLegalMoves();
-            List<Move> relevantMoves = new List<Move>();
-
-            for (int i = 0; i < allMoves.Length; i++)
-            {
-                if (IsRelevantMove(board, allMoves[i]))
-                {
-                    relevantMoves.Add(allMoves[i]);
-                }
-            }
-
-            return relevantMoves;
-        }
-
         bool IsRelevantMove(Board board, Move move)
         {
             return move.IsCapture || move.IsPromotion || move.IsEnPassant;
         }
-
-        #region Utilities
-
-        public static int CountBitsSetTo1(ulong number)
-        {
-            int count = 0;
-            while (number > 0)
-            {
-                count += (int)(number & 1); // Check the rightmost bit and add it to the count
-                number >>= 1; // Shift the number one bit to the right
-            }
-            return count;
-        }
-
-        #endregion
     }
 }
