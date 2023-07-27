@@ -79,6 +79,27 @@ namespace ChessChallenge.Example
             return boardValue;
         }
 
+        int LookUpTableEvaluationv2(Board board)
+        {
+            if (board.IsInCheckmate())
+                return GetMultiplier(!board.IsWhiteToMove) * 1000000;
+
+            if (board.IsDraw())
+                return 0;
+
+            int boardValue = 0;
+            for (int i = 1; i < (int)PieceType.King; i++)
+            {
+                boardValue += CountBitsSetTo1(board.GetPieceBitboard((PieceType)i, true)) * pieceValues[i];
+            }
+            for (int i = 1; i < (int)PieceType.King; i++)
+            {
+                boardValue -= CountBitsSetTo1(board.GetPieceBitboard((PieceType)i, false)) * pieceValues[i];
+            }
+
+            return boardValue;
+        }
+
         int GetPieceValue(Board board, Piece piece)
         {
             int value = pieceValues[(int)piece.PieceType];
@@ -123,6 +144,17 @@ namespace ChessChallenge.Example
         bool IsRelevantMove(Board board, Move move)
         {
             return move.IsCapture || move.IsPromotion || move.IsEnPassant;
+        }
+
+        public static int CountBitsSetTo1(ulong number)
+        {
+            int count = 0;
+            while (number > 0)
+            {
+                count += (int)(number & 1); // Check the rightmost bit and add it to the count
+                number >>= 1; // Shift the number one bit to the right
+            }
+            return count;
         }
     }
 }
