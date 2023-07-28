@@ -19,6 +19,7 @@ public class MyBot : IChessBot
     public class Node
     {
         public Board Board { get; }
+        public ulong ZobristKey { get; }
         public Node Parent { get; }
         public List<Node> Children { get; }
         public int Visits { get; set; }
@@ -35,12 +36,15 @@ public class MyBot : IChessBot
             Wins = 0;
             Move = move;
             IsWhiteMove = isMaxPlayer;
-        }
 
-        public bool IsFullyExpanded()
-        {
-            // For simplicity, we assume all possible moves are children
-            return Children.Count == Board.GetLegalMoves().Length;
+            if(move != Move.NullMove)
+            {
+                board.MakeMove(move);
+                ZobristKey = board.ZobristKey;
+                board.UndoMove(move);
+            }
+            else
+                ZobristKey = board.ZobristKey;
         }
 
         public Node GetBestChild()
@@ -52,6 +56,7 @@ public class MyBot : IChessBot
             {
                 double uctValue = (child.Wins / child.Visits) +
                                   Math.Sqrt(2 * Math.Log(Visits) / child.Visits);
+                uctValue *= IsWhiteMove ? 1 : -1;
                 if (uctValue > maxUctValue)
                 {
                     maxUctValue = uctValue;
@@ -74,11 +79,15 @@ public class MyBot : IChessBot
             }
             return null; // All children are explored, this should not happen in Tic Tac Toe
         }
+
+        public override string ToString() => $"{Move.ToString()} visits:{Visits} wins:{Wins}";
+
     }
 
     public class MonteCarloTreeSearch
     {
         private Board board;
+        private Stack<Move> movesToReroll = new Stack<Move>();
         private Node root;
         private Random random;
 
@@ -89,37 +98,76 @@ public class MyBot : IChessBot
             random = new Random();
         }
 
-        public Move RunMCTS(Timer timer, int timeToThinkInMilliseconds)
+        void ApplyMove(Move move)
+        {
+            if (move.IsNull)
+                return;
+
+            movesToReroll.Push(move);
+            board.MakeMove(move);
+        }
+
+        void UndoLastMove()
+        {
+            board.UndoMove(movesToReroll.Pop());
+        }
+
+        void UndoAllMoves()
+        {
+            while(movesToReroll.Count > 0)
+            {
+                UndoLastMove();
+            }
+        }
+
+        public Move RunMCTS(Timer timer, int iterations)
         {
             if (root == null)
             {
                 throw new InvalidOperationException("MCTS cannot run without a root node.");
             }
 
-            while(timer.MillisecondsElapsedThisTurn < timeToThinkInMilliseconds) 
+            while(timer.MillisecondsElapsedThisTurn < iterations)
+            //for (int i = 0; i < iterations; i++)
             {
                 Node selectedNode = Selection(root);
-                Node expandedNode = Expansion(selectedNode);
-                double simulationResult = Simulation(expandedNode);
-                Backpropagation(expandedNode, simulationResult);
+
+                double simulationResult = Simulation(selectedNode);
+                Backpropagation(selectedNode, simulationResult);
+                
+                UndoAllMoves();
             }
 
             // Choose the best move based on the most visited child
-            Node bestChild = root.Children.OrderByDescending(child => child.Visits).FirstOrDefault();
+            Node bestChild = board.IsWhiteToMove ? 
+                root.Children.OrderByDescending(child => child.Visits).FirstOrDefault() :
+                root.Children.OrderBy(child => child.Visits).FirstOrDefault();
             return bestChild.Move;
         }
 
         private Node Selection(Node node)
         {
-            while (node.Children.Count > 0)
+            Node localNode = node;
+
+            do
             {
-                if (!node.IsFullyExpanded())
+                Node expandedNode = Expansion(localNode);
+                if (expandedNode != null)
                 {
-                    return Expansion(node);
+                    ApplyMove(expandedNode.Move);
+                    return expandedNode;
                 }
-                node = node.GetBestChild();
-            }
-            return node;
+                else
+                {
+                    localNode = localNode.GetBestChild();
+                    ApplyMove(localNode.Move);
+                }
+            } while (localNode.Children.Count > 0);
+
+            localNode = Expansion(localNode);
+            if(localNode != null)
+                ApplyMove(localNode.Move);
+            return localNode;
         }
 
         private Node Expansion(Node node)
@@ -127,7 +175,7 @@ public class MyBot : IChessBot
             Node unexploredChild = node.SelectUnexploredChild();
             if (unexploredChild == null)
             {
-                return node; // All children are explored, this should not happen in Tic Tac Toe
+                return null; // All children are explored, this should not happen in Tic Tac Toe
             }
             node.Children.Add(unexploredChild);
             return unexploredChild;
@@ -135,24 +183,18 @@ public class MyBot : IChessBot
 
         private double Simulation(Node node)
         {
-            Stack<Move> movesMade = new Stack<Move>();
-            while(!board.IsDraw() && !board.IsInCheckmate())
+            //return LookUpTableEvaluation(board);
+
+            Node localNode = node;
+
+            for (int i = 0; i < 10 && !board.IsDraw() && !board.IsInCheckmate(); i++)
             {
                 Move[] moves = board.GetLegalMoves();
                 Move move = moves[random.Next(moves.Length)];
-                board.MakeMove(move);
-                movesMade.Push(move);
+                ApplyMove(move);
             }
-            int eval = 0;
-            if (board.IsDraw())
-                eval = 0;
-            if (board.IsInCheckmate())
-                eval = board.IsWhiteToMove ? -1000000 : 1000000;
 
-            while(movesMade.Count > 0)
-            {
-                board.UndoMove(movesMade.Pop());
-            }
+            int eval = LookUpTableEvaluation(board);
             
             return eval;
         }
@@ -170,6 +212,40 @@ public class MyBot : IChessBot
         public void SetRoot(Node node)
         {
             root = node;
+        }
+
+        public int CountBitsSetTo1(ulong number)
+        {
+            int count = 0;
+            while (number > 0)
+            {
+                count += (int)(number & 1); // Check the rightmost bit and add it to the count
+                number >>= 1; // Shift the number one bit to the right
+            }
+            return count;
+        }
+
+        // Piece values: null, pawn, knight, bishop, rook, queen, king
+        int[] pieceValues = { 0, 100, 300, 300, 500, 900, 10000 };
+        public int LookUpTableEvaluation(Board board)
+        {
+            if (board.IsInCheckmate())
+                return board.IsWhiteToMove ? -1000000 : 1000000;
+
+            if (board.IsDraw())
+                return 0;
+
+            int boardValue = 0;
+            for (int i = 1; i < (int)PieceType.King; i++)
+            {
+                boardValue += CountBitsSetTo1(board.GetPieceBitboard((PieceType)i, true)) * pieceValues[i];
+            }
+            for (int i = 1; i < (int)PieceType.King; i++)
+            {
+                boardValue -= CountBitsSetTo1(board.GetPieceBitboard((PieceType)i, false)) * pieceValues[i];
+            }
+
+            return boardValue;
         }
     }
 }
